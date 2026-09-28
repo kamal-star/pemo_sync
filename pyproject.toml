@@ -1,0 +1,17 @@
+[project]
+name = "pemo_sync"
+authors = [{ name = "Designsmith", email = "kamal.maharofficial@gmail.com" }]
+description = "Import Pemo card spend into ERPNext as Journal Entries, with receipts."
+requires-python = ">=3.10"
+readme = "README.md"
+dynamic = ["version"]
+dependencies = [
+    "requests>=2.20",
+]
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.module]
+name = "pemo_sync"

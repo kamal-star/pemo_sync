@@ -1,0 +1,138 @@
+{
+ "actions": [],
+ "creation": "2026-09-28 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_connection",
+  "environment",
+  "api_key",
+  "column_break_conn",
+  "download_receipts",
+  "skip_funding_movements",
+  "section_defaults",
+  "company",
+  "pemo_account",
+  "default_cost_center",
+  "column_break_def",
+  "input_vat_account",
+  "vat_rate",
+  "je_workflow_state"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_connection",
+   "fieldtype": "Section Break",
+   "label": "Connection"
+  },
+  {
+   "default": "Production",
+   "description": "Keys are environment-bound: a Sandbox key does not work against Production.",
+   "fieldname": "environment",
+   "fieldtype": "Select",
+   "label": "Environment",
+   "options": "Production\nSandbox",
+   "reqd": 1
+  },
+  {
+   "description": "Issued from the Pemo app. Stored encrypted; never sent to the browser.",
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key",
+   "length": 255
+  },
+  {
+   "fieldname": "column_break_conn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Pemo receipt links expire about 30 minutes after a fetch, so receipts are saved as private files during the fetch and copied onto each Journal Entry.",
+   "fieldname": "download_receipts",
+   "fieldtype": "Check",
+   "label": "Download Receipts"
+  },
+  {
+   "default": "1",
+   "description": "Skip topUp / walletTransfer / subWalletTransfer. Wallet funding is already booked from the bank side (e.g. BOB OD -> PEMO - DS); importing it too would double count.",
+   "fieldname": "skip_funding_movements",
+   "fieldtype": "Check",
+   "label": "Skip Wallet Funding Movements"
+  },
+  {
+   "fieldname": "section_defaults",
+   "fieldtype": "Section Break",
+   "label": "Posting Defaults"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "description": "The asset account the Pemo wallet sits in. Credited for spend, debited for refunds.",
+   "fieldname": "pemo_account",
+   "fieldtype": "Link",
+   "label": "Pemo Wallet Account",
+   "options": "Account"
+  },
+  {
+   "description": "Used when a row has no Project, or its Project has no Cost Center. Falls back to the Company's default.",
+   "fieldname": "default_cost_center",
+   "fieldtype": "Link",
+   "label": "Default Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "column_break_def",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Recoverable input VAT, debited when a row is VAT Applicable = Yes.",
+   "fieldname": "input_vat_account",
+   "fieldtype": "Link",
+   "label": "Input VAT Account",
+   "options": "Account"
+  },
+  {
+   "default": "5",
+   "description": "Used to back the VAT out of the VAT-inclusive Pemo amount.",
+   "fieldname": "vat_rate",
+   "fieldtype": "Percent",
+   "label": "VAT Rate"
+  },
+  {
+   "default": "Waiting for Accounts Approval",
+   "description": "Draft workflow state new Journal Entries are moved into, so they appear for approval. Leave blank to keep them in Draft. Must be a draft (docstatus 0) state of the active Journal Entry workflow.",
+   "fieldname": "je_workflow_state",
+   "fieldtype": "Data",
+   "label": "Journal Entry Workflow State"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-28 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pemo Sync",
+ "name": "Pemo Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Accounts Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

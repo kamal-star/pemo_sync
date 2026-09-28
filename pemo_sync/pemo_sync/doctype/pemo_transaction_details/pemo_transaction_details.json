@@ -1,0 +1,346 @@
+{
+ "actions": [],
+ "creation": "2026-09-28 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "supplier",
+  "merchant",
+  "amount_incl",
+  "expense_account",
+  "project",
+  "vat_applicable",
+  "verified",
+  "journal_entry",
+  "column_break_main",
+  "remarks",
+  "memo",
+  "invoice_no",
+  "supplier_trn",
+  "receipt_attachment",
+  "receipt_files",
+  "section_vat",
+  "vat_account",
+  "tax_rate",
+  "manual_vat",
+  "column_break_vat",
+  "amount_excl_vat",
+  "vat_amount",
+  "section_pemo",
+  "pemo_transaction_id",
+  "pemo_reference",
+  "pemo_line_id",
+  "transaction_type",
+  "pemo_status",
+  "is_credit",
+  "column_break_pemo",
+  "amount_incl_vat",
+  "currency",
+  "original_amount",
+  "original_currency",
+  "pemo_category",
+  "pemo_vat_code",
+  "column_break_card",
+  "spender",
+  "cardholder",
+  "mcc",
+  "pemo_file"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "description": "Pemo's vendor for this spend, falling back to the merchant name.",
+   "fieldname": "supplier",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Supplier"
+  },
+  {
+   "fieldname": "merchant",
+   "fieldtype": "Data",
+   "label": "Merchant",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "description": "Gross, VAT inclusive, in the wallet currency. This is what gets booked.",
+   "fieldname": "amount_incl",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount incl VAT",
+   "read_only_depends_on": "eval:doc.pemo_transaction_id",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Expense Account",
+   "options": "Account",
+   "allow_on_submit": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Project",
+   "options": "Project",
+   "allow_on_submit": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "vat_applicable",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "VAT Applicable",
+   "options": "\nYes\nNo",
+   "allow_on_submit": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "verified",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Verified",
+   "allow_on_submit": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Journal Entry",
+   "no_copy": 1,
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "label": "Remarks",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "memo",
+   "fieldtype": "Data",
+   "label": "Memo",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "invoice_no",
+   "fieldtype": "Data",
+   "label": "Invoice No",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "supplier_trn",
+   "fieldtype": "Data",
+   "label": "Supplier TRN"
+  },
+  {
+   "fieldname": "receipt_attachment",
+   "fieldtype": "Attach",
+   "label": "Receipt"
+  },
+  {
+   "description": "Every receipt file saved for this transaction, one URL per line. All of them are attached to the Journal Entry.",
+   "fieldname": "receipt_files",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Receipt Files",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_vat",
+   "fieldtype": "Section Break",
+   "label": "VAT"
+  },
+  {
+   "fieldname": "vat_account",
+   "fieldtype": "Link",
+   "label": "VAT Account",
+   "options": "Account",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "tax_rate",
+   "fieldtype": "Float",
+   "label": "Tax Rate",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "default": "0",
+   "description": "Tick to type the VAT amount from the receipt instead of backing it out at the standard rate (e.g. a receipt with some zero-rated items).",
+   "fieldname": "manual_vat",
+   "fieldtype": "Check",
+   "label": "Manual VAT Amount",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "column_break_vat",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amount_excl_vat",
+   "fieldtype": "Currency",
+   "label": "Amount excl VAT",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "vat_amount",
+   "fieldtype": "Currency",
+   "label": "VAT Amount",
+   "read_only_depends_on": "eval:!doc.manual_vat",
+   "allow_on_submit": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_pemo",
+   "fieldtype": "Section Break",
+   "label": "From Pemo"
+  },
+  {
+   "fieldname": "pemo_transaction_id",
+   "fieldtype": "Data",
+   "label": "Pemo Transaction ID",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "pemo_reference",
+   "fieldtype": "Data",
+   "label": "Pemo Reference",
+   "read_only": 1
+  },
+  {
+   "description": "Set when Pemo split the transaction into lines; one row per line.",
+   "fieldname": "pemo_line_id",
+   "fieldtype": "Data",
+   "label": "Pemo Line ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transaction_type",
+   "fieldtype": "Data",
+   "label": "Transaction Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pemo_status",
+   "fieldtype": "Data",
+   "label": "Pemo Status",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Money came back to the wallet (refund, cashback, chargeback, reversal). Posted with debit and credit swapped.",
+   "fieldname": "is_credit",
+   "fieldtype": "Check",
+   "label": "Is Credit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_pemo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Pemo totalAmount: billing amount plus FX fee, in the wallet currency.",
+   "fieldname": "amount_incl_vat",
+   "fieldtype": "Currency",
+   "label": "Pemo Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Data",
+   "label": "Wallet Currency",
+   "read_only": 1
+  },
+  {
+   "description": "What the merchant charged, in the merchant's currency.",
+   "fieldname": "original_amount",
+   "fieldtype": "Float",
+   "label": "Original Amount",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "original_currency",
+   "fieldtype": "Data",
+   "label": "Original Currency",
+   "read_only": 1
+  },
+  {
+   "description": "Pemo's chart-of-accounts value and code. Used to pre-fill Expense Account when it matches an account name or number.",
+   "fieldname": "pemo_category",
+   "fieldtype": "Data",
+   "label": "Pemo Category",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pemo_vat_code",
+   "fieldtype": "Data",
+   "label": "Pemo VAT Code",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_card",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "spender",
+   "fieldtype": "Data",
+   "label": "Spender",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cardholder",
+   "fieldtype": "Data",
+   "label": "Cardholder",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mcc",
+   "fieldtype": "Data",
+   "label": "MCC",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pemo_file",
+   "fieldtype": "Attach",
+   "hidden": 1,
+   "label": "Pemo File (legacy)"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-28 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pemo Sync",
+ "name": "Pemo Transaction Details",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

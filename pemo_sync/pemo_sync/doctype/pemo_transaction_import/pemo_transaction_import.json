@@ -1,0 +1,186 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:PEMO-{YY}-{#####}",
+ "creation": "2026-09-28 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "start_date",
+  "end_date",
+  "include_already_exported",
+  "column_break_kpnz",
+  "company",
+  "pemo_account",
+  "section_break_ndqt",
+  "transactions",
+  "section_break_fkrs",
+  "total_transactions",
+  "total_amount",
+  "posted_transactions",
+  "column_break_gbyh",
+  "pemo_export_status",
+  "pemo_export_log",
+  "last_fetch_log",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Start Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "End Date",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Normally only Pemo records released as 'ready' are fetched. Tick to also re-fetch ones already marked exported (e.g. after cancelling an import). Anything already in another draft or submitted import is still skipped.",
+   "fieldname": "include_already_exported",
+   "fieldtype": "Check",
+   "label": "Include Already Exported"
+  },
+  {
+   "fieldname": "column_break_kpnz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pemo_account",
+   "fieldtype": "Link",
+   "label": "Pemo Wallet Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_ndqt",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "transactions",
+   "fieldtype": "Table",
+   "label": "Transactions",
+   "options": "Pemo Transaction Details"
+  },
+  {
+   "fieldname": "section_break_fkrs",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "total_transactions",
+   "fieldtype": "Int",
+   "label": "Total Rows",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "label": "Net Spend",
+   "description": "Debits less credits across all rows.",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "posted_transactions",
+   "fieldtype": "Int",
+   "label": "Posted Rows",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_gbyh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "pemo_export_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Pemo Export Status",
+   "no_copy": 1,
+   "options": "\nPending\nConfirmed\nFailed",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "pemo_export_log",
+   "fieldtype": "Small Text",
+   "label": "Pemo Export Log",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_fetch_log",
+   "fieldtype": "Small Text",
+   "label": "Last Fetch",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Pemo Transaction Import",
+   "print_hide": 1,
+   "read_only": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-28 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pemo Sync",
+ "name": "Pemo Transaction Import",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User",
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
