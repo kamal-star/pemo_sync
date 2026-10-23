@@ -17,7 +17,20 @@
   "column_break_def",
   "input_vat_account",
   "vat_rate",
-  "je_workflow_state"
+  "je_workflow_state",
+  "section_pec_sync",
+  "auto_sync",
+  "sync_from_date",
+  "pec_expense_type",
+  "default_expense_claim_type",
+  "column_break_pec",
+  "default_requested_by",
+  "default_vat_applicable",
+  "pec_workflow_state",
+  "mark_pec_paid",
+  "section_pec_status",
+  "last_sync_run",
+  "last_sync_status"
  ],
  "fields": [
   {
@@ -108,11 +121,97 @@
    "fieldname": "je_workflow_state",
    "fieldtype": "Data",
    "label": "Journal Entry Workflow State"
+  },
+  {
+   "fieldname": "section_pec_sync",
+   "fieldtype": "Section Break",
+   "label": "Automatic Sync to Petty Expense Claim",
+   "description": "Every 15 minutes, each Pemo transaction marked Ready for export becomes a Petty Expense Claim, and Pemo is told it is exported."
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_sync",
+   "fieldtype": "Check",
+   "label": "Auto Sync"
+  },
+  {
+   "description": "Only transactions on or after this date are synced. Set it to the go-live date so spend already booked by hand is not claimed again.",
+   "fieldname": "sync_from_date",
+   "fieldtype": "Date",
+   "label": "Sync From Date",
+   "mandatory_depends_on": "eval:doc.auto_sync"
+  },
+  {
+   "default": "Other Expenses",
+   "description": "Claim header Expense Type. Project types are used only when Pemo gives a Project that has a Project Manager and Category; otherwise the claim falls back to Other Expenses.",
+   "fieldname": "pec_expense_type",
+   "fieldtype": "Select",
+   "label": "Claim Expense Type",
+   "options": "Other Expenses\nProject Material\nProject Works"
+  },
+  {
+   "description": "Row Expense Type when Pemo's category matches no claim type.",
+   "fieldname": "default_expense_claim_type",
+   "fieldtype": "Link",
+   "label": "Default Expense Claim Type",
+   "options": "Expense Claim Type",
+   "mandatory_depends_on": "eval:doc.auto_sync"
+  },
+  {
+   "fieldname": "column_break_pec",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Requested By is the cardholder's ERPNext user when their Pemo email matches one; otherwise this user.",
+   "fieldname": "default_requested_by",
+   "fieldtype": "Link",
+   "label": "Fallback Requested By",
+   "options": "User"
+  },
+  {
+   "default": "No",
+   "description": "Used when Pemo sends no VAT code for a transaction.",
+   "fieldname": "default_vat_applicable",
+   "fieldtype": "Select",
+   "label": "VAT Applicable when Unknown",
+   "options": "No\nYes"
+  },
+  {
+   "description": "Leave blank to create claims in Draft. Otherwise a draft workflow state of the Petty Expense Claim workflow, e.g. Waiting for Accounts Approval.",
+   "fieldname": "pec_workflow_state",
+   "fieldtype": "Data",
+   "label": "Claim Workflow State"
+  },
+  {
+   "default": "1",
+   "description": "Card spend is already paid from the Pemo wallet, so the claim must not be paid again through a Payment Entry.",
+   "fieldname": "mark_pec_paid",
+   "fieldtype": "Check",
+   "label": "Mark Claims as Paid"
+  },
+  {
+   "fieldname": "section_pec_status",
+   "fieldtype": "Section Break",
+   "label": "Last Sync"
+  },
+  {
+   "fieldname": "last_sync_run",
+   "fieldtype": "Datetime",
+   "label": "Last Sync Run",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "last_sync_status",
+   "fieldtype": "Small Text",
+   "label": "Last Sync Status",
+   "read_only": 1,
+   "no_copy": 1
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-09-28 12:00:00.000000",
+ "modified": "2026-10-23 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Pemo Sync",
  "name": "Pemo Settings",

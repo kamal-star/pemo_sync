@@ -346,13 +346,19 @@ def to_local_date(value):
 
 
 def _already_imported_ids():
-    """Transaction ids sitting in any draft or submitted import (not cancelled)."""
+    """Transaction ids already in ERPNext: any live import row, or any Petty Expense Claim.
+
+    The claims come from the automatic sync (pemo_sync.pec_sync); counting them
+    here stops a manual import from booking the same spend a second time.
+    """
     rows = frappe.get_all(
         ROW_DOCTYPE,
         filters={"parenttype": IMPORT_DOCTYPE, "docstatus": ["<", 2], "pemo_transaction_id": ["is", "set"]},
         pluck="pemo_transaction_id",
     )
-    return set(rows)
+    from pemo_sync.pec_sync import claimed_transaction_ids
+
+    return set(rows) | claimed_transaction_ids()
 
 
 def _notify(user, name, ok, message):

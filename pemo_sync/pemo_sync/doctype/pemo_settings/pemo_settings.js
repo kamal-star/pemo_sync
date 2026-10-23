@@ -14,7 +14,26 @@ frappe.ui.form.on("Pemo Settings", {
 		}));
 	},
 
+	onload(frm) {
+		frappe.realtime.off("pemo_pec_sync_done");
+		frappe.realtime.on("pemo_pec_sync_done", (data) => {
+			const ok = (data.message || "").startsWith("OK");
+			frappe.show_alert({ message: (data.message || "").split("\n")[0], indicator: ok ? "green" : "red" }, 15);
+			frm.reload_doc();
+		});
+	},
+
 	refresh(frm) {
+		frm.set_query("default_requested_by", () => ({ filters: { enabled: 1, user_type: "System User" } }));
+		frm.add_custom_button(__("Sync Now"), () => {
+			if (frm.is_dirty()) {
+				frappe.msgprint(__("Save first."));
+				return;
+			}
+			frm.call({ method: "sync_now", doc: frm.doc, freeze: true }).then((r) => {
+				if (r.message) frappe.show_alert({ message: r.message, indicator: "blue" }, 10);
+			});
+		});
 		frm.add_custom_button(__("Test Connection"), () => {
 			if (frm.is_dirty()) {
 				frappe.msgprint(__("Save first."));

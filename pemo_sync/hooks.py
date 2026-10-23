@@ -17,6 +17,18 @@ after_install = "pemo_sync.install.after_install"
 after_migrate = "pemo_sync.install.after_migrate"
 
 # ---------------------------------------------------------------------------
+# Scheduler
+# ---------------------------------------------------------------------------
+# Pemo has no webhooks, so "push" is a pull every 15 minutes: transactions an
+# accountant marked Ready for export become Petty Expense Claims. The job is a
+# no-op unless Pemo Settings → Auto Sync is ticked.
+scheduler_events = {
+    "cron": {
+        "*/15 * * * *": ["pemo_sync.pec_sync.scheduled_sync"],
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Journal Entry lifecycle
 # ---------------------------------------------------------------------------
 # When a Pemo JE is deleted (rejected draft) or cancelled, free its import row

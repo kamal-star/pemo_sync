@@ -1,9 +1,67 @@
 # Pemo Sync (ERPNext app)
 
-Pulls Pemo card spend into ERPNext through Pemo's External API, and books it as
-Journal Entries with the receipts attached. Built for Designsmith (Frappe/ERPNext v15).
+Brings Pemo card spend into ERPNext through Pemo's External API, with the receipts
+attached. Built for Designsmith (Frappe/ERPNext v15).
 
-## What it does
+There are two ways in:
+
+- **Automatic (main flow):** when someone in Pemo marks a transaction **Ready for
+  export**, it arrives in ERPNext as a **Petty Expense Claim**.
+- **Manual:** a **Pemo Transaction Import** turns a date range into Journal Entries.
+  Use it for refunds and back-fills.
+
+## Automatic sync: Pemo → Petty Expense Claim
+
+Pemo's API is pull-only: it has no webhooks. So the "push" is a scheduled pull that
+runs every 15 minutes while **Pemo Settings → Auto Sync** is ticked. **Sync Now** runs
+it immediately.
+
+Each pass:
+
+1. Asks Pemo for transactions marked Ready for export, dated on or after **Sync From
+   Date**.
+2. Creates one **Petty Expense Claim** per transaction. It goes through the normal PEC
+   approval workflow, and the site's "JV CREATION NEW -v" script posts it on approval.
+3. Tells Pemo the transaction is exported (`PATCH markAsExported`), so it never arrives
+   twice.
+
+### How a claim is filled
+
+| Claim field | From |
+|---|---|
+| Requested By | the cardholder's ERPNext user (matched by Pemo email), else Settings → Fallback Requested By |
+| Expense Type | Settings → Claim Expense Type (Other Expenses). A project type is used only when Pemo gives a Project with a Project Manager and Category |
+| Date, Cheque Number | transaction date (Designsmith time); Pemo reference |
+| Petty Cash Account | the Pemo wallet (PEMO - DS), so the approval JE credits the wallet |
+| Status | Paid. The card already paid it, so it must not be paid again through a Payment Entry |
+| Rows | one per Pemo line (split transactions give several rows) |
+| Row Expense Type + Account | Pemo's category → the account with that number or name → the Expense Claim Type that defaults to that account. Else a claim type named like the category. Else Settings → Default Expense Claim Type |
+| Row VAT | Pemo VAT code (5% → Yes; zero/exempt → No); else Settings → VAT Applicable when Unknown |
+| Pemo section | transaction id, reference, type, cardholder, supplier, TRN, invoice no |
+| Attachments | every receipt, downloaded during the pass (Pemo's links expire after about 30 minutes) |
+
+### What is not turned into a claim
+
+| Pemo record | What happens | Marked exported? |
+|---|---|---|
+| Top-up / wallet transfer | skipped: wallet funding is booked from the bank side | yes, so it stops recurring |
+| Declined, zero amount | skipped | yes |
+| Refund / cashback / reversal | **held**: book it with a Pemo Transaction Import, which reverses the expense | no, it stays Ready in Pemo |
+| Not in company currency | **held** | no |
+| Receipt download failed | claim created; receipts retried next pass with fresh links | only after the receipts arrive |
+
+**Last Sync Status** on Pemo Settings lists every held and skipped record. Errors also
+go to the Error Log.
+
+### Safety
+
+- If the database commit succeeds but the call to Pemo fails, the claim already exists.
+  The next pass sees the transaction id is already claimed and only confirms it, so
+  nothing is booked twice.
+- A pass that starts while another is still running skips itself (file lock).
+- Pemo Transaction Import skips anything that already has a claim.
+
+## Manual import: Pemo Transaction Import → Journal Entries
 
 1. **Fetch.** On a draft **Pemo Transaction Import**, click **Fetch from Pemo**. A
    background job pulls `GET /v1/transactions` for the date range, 50 at a time, and
@@ -97,6 +155,16 @@ bench restart
   which is not installed here, and *Create Jv* would post every row a second time.
 - It adds **Pemo Import** and **Pemo Transaction ID** fields to Journal Entry.
 
+## Update an installed site
+
+```bash
+cd ~/frappe-bench/apps/pemo_sync && git pull
+cd ~/frappe-bench && bench --site erp.designsmith.ae migrate && bench restart
+```
+
+`migrate` adds the Pemo fields to Petty Expense Claim. The scheduler must be on for
+Auto Sync: `bench --site erp.designsmith.ae enable-scheduler`.
+
 ## Configure: Pemo Settings
 
 | Field | Designsmith value |
@@ -108,12 +176,20 @@ bench restart
 | Input VAT Account | VAT Input - DS (VAT 5% - DS is disabled) |
 | VAT Rate | 5 |
 | Default Cost Center | Group - DS |
-| Journal Entry Workflow State | Waiting for Accounts Approval |
+| Journal Entry Workflow State | Waiting for Accounts Approval (manual import only) |
+| Auto Sync | tick once Test Connection passes |
+| Sync From Date | the go-live date, so spend already booked by hand is not claimed again |
+| Claim Expense Type | Other Expenses |
+| Default Expense Claim Type | Miscellaneous Expense (→ Office expenses - DS) |
+| Fallback Requested By | an accounts user who owns claims from cards with no ERPNext user |
+| VAT Applicable when Unknown | No |
+| Claim Workflow State | blank (Draft), or Waiting for Accounts Approval |
+| Mark Claims as Paid | ticked |
 
 Save, then click **Test Connection**.
 
-The background jobs need workers running: the `long` queue for fetches and the
-`short` queue for confirmations.
+The background jobs need workers running: the `long` queue for fetches and syncs,
+and the `short` queue for confirmations.
 
 ## Permissions
 
