@@ -93,10 +93,18 @@ class PemoTransactionImport(Document):
             },
             fields=["pemo_transaction_id", "parent"],
         )
+        from pemo_sync.pec_sync import PEC, claimed_transaction_ids
+
+        claimed = claimed_transaction_ids() & set(ids)
+        if claimed:
+            claims = frappe.get_all(PEC, filters={"pemo_transaction_id": ["in", list(claimed)]}, fields=["name", "pemo_transaction_id"])
+            clashes += [frappe._dict(pemo_transaction_id=c.pemo_transaction_id, parent=c.name) for c in claims]
         if clashes:
             frappe.throw(
-                "<br>".join(_("{0} is already in {1}").format(c.pemo_transaction_id, c.parent) for c in clashes[:20]),
-                title=_("Pemo transactions imported twice"),
+                "<br>".join(_("{0} is already in {1}").format(c.pemo_transaction_id, c.parent) for c in clashes[:20])
+                + "<br><br>"
+                + _("Remove these rows: each Pemo transaction may be booked once."),
+                title=_("Pemo transactions booked twice"),
             )
 
     def _calculate(self):

@@ -91,6 +91,7 @@ def _sync():
     start_iso, end_iso = importer.utc_window(settings.sync_from_date, now_datetime().date())
 
     claimed = _claims_by_transaction()
+    in_imports = _ids_in_live_imports()
     counts = {"created": 0, "reconfirmed": 0, "skipped": 0, "held": 0, "failed": 0, "receipt_retry": 0}
     notes = []
 
@@ -111,6 +112,14 @@ def _sync():
                 counts["receipt_retry"] += 1 if receipts_pending else 0
                 counts["reconfirmed"] += 1
                 confirm.append(txn_id)
+                continue
+
+            if txn_id in in_imports:
+                # Someone pulled it into a manual Pemo Transaction Import. Booking it
+                # here too would double it; the import decides (submit it, or delete
+                # the row and the next pass claims it).
+                counts["held"] += 1
+                notes.append(f"{txn_id} ({txn.get('merchant')}): already in {in_imports[txn_id]}, not claimed")
                 continue
 
             reason, hold = _skip_reason(txn, settings, currency)
@@ -178,6 +187,16 @@ def _skip_reason(txn, settings, currency):
     if reason and "currency" in reason:
         return reason, True
     return reason, False
+
+
+def _ids_in_live_imports():
+    """{transaction id: import name} for rows in draft or submitted Pemo Transaction Imports."""
+    rows = frappe.get_all(
+        importer.ROW_DOCTYPE,
+        filters={"parenttype": importer.IMPORT_DOCTYPE, "docstatus": ["<", 2], "pemo_transaction_id": ["is", "set"]},
+        fields=["pemo_transaction_id", "parent"],
+    )
+    return {r.pemo_transaction_id: r.parent for r in rows}
 
 
 def _claims_by_transaction():
