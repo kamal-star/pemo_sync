@@ -146,7 +146,7 @@ def _sync():
             counts["created"] += 1
             if amount_note:
                 notes.append(f"{pec_name}: {amount_note}")
-            if settings.pec_auto_submit:
+            if settings.get("pec_auto_submit"):
                 if complete:
                     error = _submit_claim(pec_name)
                     if error:
@@ -167,7 +167,7 @@ def _sync():
 
     posted = (
         f" ({counts['submitted']} submitted, {counts['draft']} kept in Draft)"
-        if settings.pec_auto_submit and counts["created"]
+        if settings.get("pec_auto_submit") and counts["created"]
         else ""
     )
     status = (
@@ -246,7 +246,7 @@ def _create_claim(txn, settings, currency):
             pec.db_set("pemo_receipt_pending", 1, update_modified=False)
 
     state = (settings.pec_workflow_state or "").strip()
-    if state and not (settings.pec_auto_submit and complete) and state != (pec.get("workflow_state") or "Draft"):
+    if state and not (settings.get("pec_auto_submit") and complete) and state != (pec.get("workflow_state") or "Draft"):
         pec.workflow_state = state
         pec.save()
     return pec.name, receipts_ok, complete, amount_note
@@ -477,7 +477,7 @@ def refresh_claim(name):
     )
     if amount_note:
         message += "<br>" + amount_note
-    if settings.pec_auto_submit:
+    if settings.get("pec_auto_submit"):
         if complete:
             error = _submit_claim(name)
             message += "<br>" + (_("Submit failed: {0}").format(error) if error else _("Submitted."))
