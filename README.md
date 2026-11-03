@@ -42,11 +42,10 @@ it is created, with no approval. The workflow goes straight to Approved, and "JV
 CREATION NEW -v" posts the Journal Entry. The submit runs as Administrator, so it
 doesn't depend on who clicked Sync Now.
 
-**A claim whose Pemo transaction has no category stays in Draft.** It would otherwise
-post to the default account. To finish one: set the category in Pemo, open the claim,
-and click **Refresh from Pemo**. That button is a Client Script ("Pemo: Refresh from Pemo")
-that migrate installs, because Frappe ignores an app's form scripts on custom doctypes. That rebuilds the rows, amounts and VAT from Pemo,
-then submits the claim. Last Sync Status lists every claim kept in Draft.
+**Every claim is submitted, including one whose Pemo transaction has no category.**
+That one posts to the default claim type's account (Miscellaneous Expense → Office
+expenses - DS) with VAT No, and Last Sync Status flags it. To avoid this, set the
+category and VAT code in Pemo before marking a transaction Ready for export.
 
 ### Amounts
 
@@ -214,8 +213,8 @@ Auto Sync: `bench --site erp.designsmith.ae enable-scheduler`.
 | Default Expense Claim Type | Miscellaneous Expense (→ Office expenses - DS) |
 | Fallback Requested By | an accounts user who owns claims from cards with no ERPNext user |
 | VAT Applicable when Unknown | No |
-| Include Transactions Exported in Pemo | ticked (Export in Pemo lands in ERPNext) |
-| Auto Submit Claims | ticked (no approval; claims with no Pemo category stay Draft) |
+| Include Transactions Exported in Pemo | unticked (only Ready for export is fetched) |
+| Auto Submit Claims | ticked (no approval; every claim is submitted) |
 | Claim Workflow State | blank (only used when a claim is not auto-submitted) |
 | Mark Claims as Paid | ticked |
 

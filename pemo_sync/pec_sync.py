@@ -165,15 +165,17 @@ def _sync():
             if amount_note:
                 notes.append(f"{pec_name}: {amount_note}")
             if settings.get("pec_auto_submit"):
-                if complete:
-                    error = _submit_claim(pec_name)
-                    if error:
-                        notes.append(f"{pec_name}: left in Draft, submit failed: {error}")
-                    else:
-                        counts["submitted"] += 1
-                else:
+                # Every claim is submitted, categorised or not (client decision,
+                # 2026-11-03). One with no Pemo category posts to the default
+                # claim type's account, so it is flagged for review.
+                if not complete:
+                    notes.append(f"{pec_name} ({txn.get('merchant')}): no category in Pemo, posted to the default account")
+                error = _submit_claim(pec_name)
+                if error:
                     counts["draft"] += 1
-                    notes.append(f"{pec_name} ({txn.get('merchant')}): kept in Draft, no category in Pemo")
+                    notes.append(f"{pec_name}: left in Draft, submit failed: {error}")
+                else:
+                    counts["submitted"] += 1
             if receipts_ok:
                 if ready:
                     confirm.append(txn_id)
@@ -274,9 +276,9 @@ def _create_claim(txn, settings, currency):
 def _claim_values(txn, settings, currency):
     """(claim field values, complete, amount note) for a Pemo transaction.
 
-    complete = every row's account came from a Pemo category. Only complete
-    claims are auto-submitted: one without a category would post to the default
-    account straight away.
+    complete = every row's account came from a Pemo category. Auto Submit posts
+    incomplete claims too (to the default claim type's account); complete only
+    decides whether the claim is flagged for review.
     """
     rows = importer.build_rows(txn, settings.company, currency)
     first = rows[0]
@@ -460,8 +462,8 @@ def refresh_claim(name):
 
     For a claim kept in Draft because Pemo had no category yet: set the category
     in Pemo, then click Refresh from Pemo. Rows, amounts, VAT and Pemo fields are
-    rebuilt; receipts are re-downloaded if missing; a now-complete claim is
-    submitted when Auto Submit is on.
+    rebuilt; receipts are re-downloaded if missing; the claim is submitted when
+    Auto Submit is on.
     """
     pec = frappe.get_doc(PEC, name)
     pec.check_permission("write")
@@ -497,11 +499,10 @@ def refresh_claim(name):
     if amount_note:
         message += "<br>" + amount_note
     if settings.get("pec_auto_submit"):
-        if complete:
-            error = _submit_claim(name)
-            message += "<br>" + (_("Submit failed: {0}").format(error) if error else _("Submitted."))
-        else:
-            message += "<br>" + _("Kept in Draft: set a category for this transaction in Pemo first.")
+        if not complete:
+            message += "<br>" + _("No category in Pemo: posted to the default account.")
+        error = _submit_claim(name)
+        message += "<br>" + (_("Submit failed: {0}").format(error) if error else _("Submitted."))
     return message
 
 
