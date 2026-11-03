@@ -95,12 +95,22 @@ def _sync():
     counts = {"created": 0, "submitted": 0, "draft": 0, "reconfirmed": 0, "skipped": 0, "held": 0, "failed": 0, "receipt_retry": 0}
     notes = []
 
-    for page in client.iter_transaction_pages(start_iso, end_iso):
+    # Pemo's own "Export" button marks a transaction exported without ever
+    # offering it as "ready", so with include_pemo_exported the pass lists every
+    # state and also claims those. Only "ready" records are confirmed back:
+    # the others are already exported in Pemo.
+    include_exported = settings.get("include_pemo_exported")
+    export_status = "all" if include_exported else "readyToExport"
+    wanted = {"ready", "exported", "manualExported"} if include_exported else {"ready"}
+
+    for page in client.iter_transaction_pages(start_iso, end_iso, export_status):
         confirm = []
         for txn in page:
             txn_id = txn.get("id")
-            if not txn_id:
-                continue
+            state = txn.get("exportStatus") or "ready"
+            if not txn_id or state not in wanted:
+                continue  # incomplete / complete: not released in Pemo yet
+            ready = state == "ready"
 
             if txn_id in claimed:
                 # Already a claim: an earlier PATCH failed, or its receipts were
@@ -110,11 +120,14 @@ def _sync():
                     counts["held"] += 1
                     continue
                 counts["receipt_retry"] += 1 if receipts_pending else 0
-                counts["reconfirmed"] += 1
-                confirm.append(txn_id)
+                if ready:
+                    counts["reconfirmed"] += 1
+                    confirm.append(txn_id)
                 continue
 
             if txn_id in in_imports:
+                if not ready:
+                    continue  # the import already owns it (a submitted import exported it)
                 # Someone pulled it into a manual Pemo Transaction Import. Booking it
                 # here too would double it; the import decides (submit it, or delete
                 # the row and the next pass claims it).
@@ -123,13 +136,16 @@ def _sync():
                 continue
 
             reason, hold = _skip_reason(txn, settings, currency)
+            if reason and not ready and not hold:
+                continue  # e.g. a top-up exported in Pemo: nothing to book, nothing to confirm
             if reason:
                 notes.append(f"{txn_id} ({txn.get('merchant') or txn.get('transactionType')}): {reason}")
                 if hold:
                     counts["held"] += 1  # left "ready" in Pemo for a person to handle
                 else:
                     counts["skipped"] += 1
-                    confirm.append(txn_id)  # handled by policy (e.g. top-up): stop it recurring
+                    if ready:
+                        confirm.append(txn_id)  # handled by policy (e.g. top-up): stop it recurring
                 continue
 
             try:
@@ -144,6 +160,8 @@ def _sync():
 
             claimed[txn_id] = (pec_name, not receipts_ok)
             counts["created"] += 1
+            if not ready:
+                notes.append(f"{pec_name}: from a transaction exported in the Pemo app")
             if amount_note:
                 notes.append(f"{pec_name}: {amount_note}")
             if settings.get("pec_auto_submit"):
@@ -157,7 +175,8 @@ def _sync():
                     counts["draft"] += 1
                     notes.append(f"{pec_name} ({txn.get('merchant')}): kept in Draft, no category in Pemo")
             if receipts_ok:
-                confirm.append(txn_id)
+                if ready:
+                    confirm.append(txn_id)
             else:
                 counts["held"] += 1
                 notes.append(f"{txn_id} → {pec_name}: receipt download failed, retried next run")

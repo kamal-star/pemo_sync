@@ -73,10 +73,42 @@ PETTY_EXPENSE_CLAIM_FIELDS = {
 }
 
 
+REFRESH_SCRIPT_NAME = "Pemo: Refresh from Pemo"
+
+
 def _create_fields():
     create_custom_fields(JOURNAL_ENTRY_FIELDS, ignore_validate=True)
     if frappe.db.exists("DocType", "Petty Expense Claim"):
         create_custom_fields(PETTY_EXPENSE_CLAIM_FIELDS, ignore_validate=True)
+        _sync_refresh_button()
+
+
+def _sync_refresh_button():
+    """Install the "Refresh from Pemo" button as a Client Script.
+
+    Petty Expense Claim is a UI-made (custom) doctype, and Frappe ignores an
+    app's doctype_js hook for custom doctypes, so the form script has to live
+    in a Client Script record. Kept in step with the app's copy on every migrate.
+    """
+    path = frappe.get_app_path("pemo_sync", "public", "js", "petty_expense_claim.js")
+    with open(path, encoding="utf-8") as f:
+        script = f.read()
+    if frappe.db.exists("Client Script", REFRESH_SCRIPT_NAME):
+        doc = frappe.get_doc("Client Script", REFRESH_SCRIPT_NAME)
+        if doc.script != script or not doc.enabled or doc.dt != "Petty Expense Claim":
+            doc.update({"dt": "Petty Expense Claim", "view": "Form", "enabled": 1, "script": script})
+            doc.save(ignore_permissions=True)
+    else:
+        frappe.get_doc(
+            {
+                "doctype": "Client Script",
+                "name": REFRESH_SCRIPT_NAME,
+                "dt": "Petty Expense Claim",
+                "view": "Form",
+                "enabled": 1,
+                "script": script,
+            }
+        ).insert(ignore_permissions=True)
 
 
 def after_install():

@@ -17,20 +17,14 @@ after_install = "pemo_sync.install.after_install"
 after_migrate = "pemo_sync.install.after_migrate"
 
 # ---------------------------------------------------------------------------
-# Form scripts on Designsmith's own doctypes
-# ---------------------------------------------------------------------------
-# "Refresh from Pemo" on a draft Petty Expense Claim that came from Pemo.
-doctype_js = {"Petty Expense Claim": "public/js/petty_expense_claim.js"}
-
-# ---------------------------------------------------------------------------
 # Scheduler
 # ---------------------------------------------------------------------------
-# Pemo has no webhooks, so "push" is a pull every 15 minutes: transactions an
-# accountant marked Ready for export become Petty Expense Claims. The job is a
+# Pemo has no webhooks, so "push" is a pull every 5 minutes: transactions
+# released (or exported) in Pemo become Petty Expense Claims. The job is a
 # no-op unless Pemo Settings → Auto Sync is ticked.
 scheduler_events = {
     "cron": {
-        "*/15 * * * *": ["pemo_sync.pec_sync.scheduled_sync"],
+        "*/5 * * * *": ["pemo_sync.pec_sync.scheduled_sync"],
     },
 }
 

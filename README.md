@@ -13,7 +13,7 @@ There are two ways in:
 ## Automatic sync: Pemo → Petty Expense Claim
 
 Pemo's API is pull-only: it has no webhooks. So the "push" is a scheduled pull that
-runs every 15 minutes while **Pemo Settings → Auto Sync** is ticked. **Sync Now** runs
+runs every 5 minutes while **Pemo Settings → Auto Sync** is ticked. **Sync Now** runs
 it immediately.
 
 Each pass:
@@ -25,6 +25,16 @@ Each pass:
 3. Tells Pemo the transaction is exported (`PATCH markAsExported`), so it never arrives
    twice.
 
+### Export button in Pemo
+
+Pemo's own **Export** button marks a transaction exported without ever offering it to
+the API as Ready. With **Include Transactions Exported in Pemo** ticked, the sync also
+claims those (exported or manualExported, on or after Sync From Date, and not already
+in ERPNext). It does not confirm them back, because Pemo already counts them as
+exported. Clicking Export in Pemo therefore lands in ERPNext within about 5 minutes,
+or immediately with **Sync Now**. Pemo has no webhooks, so nothing faster is possible
+from the ERPNext side.
+
 ### Auto Submit (Designsmith runs with it on)
 
 With **Pemo Settings → Auto Submit Claims** ticked, each claim is submitted as soon as
@@ -34,7 +44,8 @@ doesn't depend on who clicked Sync Now.
 
 **A claim whose Pemo transaction has no category stays in Draft.** It would otherwise
 post to the default account. To finish one: set the category in Pemo, open the claim,
-and click **Refresh from Pemo**. That rebuilds the rows, amounts and VAT from Pemo,
+and click **Refresh from Pemo**. That button is a Client Script ("Pemo: Refresh from Pemo")
+that migrate installs, because Frappe ignores an app's form scripts on custom doctypes. That rebuilds the rows, amounts and VAT from Pemo,
 then submits the claim. Last Sync Status lists every claim kept in Draft.
 
 ### Amounts
@@ -203,6 +214,7 @@ Auto Sync: `bench --site erp.designsmith.ae enable-scheduler`.
 | Default Expense Claim Type | Miscellaneous Expense (→ Office expenses - DS) |
 | Fallback Requested By | an accounts user who owns claims from cards with no ERPNext user |
 | VAT Applicable when Unknown | No |
+| Include Transactions Exported in Pemo | ticked (Export in Pemo lands in ERPNext) |
 | Auto Submit Claims | ticked (no approval; claims with no Pemo category stay Draft) |
 | Claim Workflow State | blank (only used when a claim is not auto-submitted) |
 | Mark Claims as Paid | ticked |

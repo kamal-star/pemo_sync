@@ -21,6 +21,7 @@
   "section_pec_sync",
   "auto_sync",
   "sync_from_date",
+  "include_pemo_exported",
   "pec_expense_type",
   "default_expense_claim_type",
   "column_break_pec",
@@ -127,7 +128,7 @@
    "fieldname": "section_pec_sync",
    "fieldtype": "Section Break",
    "label": "Automatic Sync to Petty Expense Claim",
-   "description": "Every 15 minutes, each Pemo transaction marked Ready for export becomes a Petty Expense Claim, and Pemo is told it is exported."
+   "description": "Every 5 minutes, each Pemo transaction marked Ready for export (or exported in Pemo, if ticked below) becomes a Petty Expense Claim. Sync Now runs it immediately."
   },
   {
    "default": "0",
@@ -141,6 +142,13 @@
    "fieldtype": "Date",
    "label": "Sync From Date",
    "mandatory_depends_on": "eval:doc.auto_sync"
+  },
+  {
+   "default": "1",
+   "description": "Also claim transactions exported with the Export button inside the Pemo app. Pemo marks those exported without ever offering them as Ready, so without this they never reach ERPNext.",
+   "fieldname": "include_pemo_exported",
+   "fieldtype": "Check",
+   "label": "Include Transactions Exported in Pemo"
   },
   {
    "default": "Other Expenses",
@@ -219,7 +227,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-03 12:00:00.000000",
+ "modified": "2026-11-03 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Pemo Sync",
  "name": "Pemo Settings",
