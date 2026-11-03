@@ -65,8 +65,9 @@ PETTY_EXPENSE_CLAIM_FIELDS = {
         _pec_field("pemo_supplier", "Supplier (Pemo)", "pemo_cardholder"),
         _pec_field("pemo_supplier_trn", "Supplier TRN", "pemo_supplier"),
         _pec_field("pemo_invoice_no", "Invoice No", "pemo_supplier_trn"),
+        _pec_field("pemo_category", "Pemo Category", "pemo_invoice_no"),
         _pec_field(
-            "pemo_receipt_pending", "Receipt Download Pending", "pemo_invoice_no", fieldtype="Check", hidden=1, default="0"
+            "pemo_receipt_pending", "Receipt Download Pending", "pemo_category", fieldtype="Check", hidden=1, default="0"
         ),
     ]
 }

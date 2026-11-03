@@ -92,7 +92,7 @@ def _sync():
 
     claimed = _claims_by_transaction()
     in_imports = _ids_in_live_imports()
-    counts = {"created": 0, "reconfirmed": 0, "skipped": 0, "held": 0, "failed": 0, "receipt_retry": 0}
+    counts = {"created": 0, "submitted": 0, "draft": 0, "reconfirmed": 0, "skipped": 0, "held": 0, "failed": 0, "receipt_retry": 0}
     notes = []
 
     for page in client.iter_transaction_pages(start_iso, end_iso):
@@ -133,7 +133,7 @@ def _sync():
                 continue
 
             try:
-                pec_name, receipts_ok = _create_claim(txn, settings, currency)
+                pec_name, receipts_ok, complete, amount_note = _create_claim(txn, settings, currency)
                 frappe.db.commit()
             except Exception as e:
                 frappe.db.rollback()
@@ -144,6 +144,18 @@ def _sync():
 
             claimed[txn_id] = (pec_name, not receipts_ok)
             counts["created"] += 1
+            if amount_note:
+                notes.append(f"{pec_name}: {amount_note}")
+            if settings.pec_auto_submit:
+                if complete:
+                    error = _submit_claim(pec_name)
+                    if error:
+                        notes.append(f"{pec_name}: left in Draft, submit failed: {error}")
+                    else:
+                        counts["submitted"] += 1
+                else:
+                    counts["draft"] += 1
+                    notes.append(f"{pec_name} ({txn.get('merchant')}): kept in Draft, no category in Pemo")
             if receipts_ok:
                 confirm.append(txn_id)
             else:
@@ -153,8 +165,13 @@ def _sync():
         if confirm:
             client.mark_transactions_exported(confirm)
 
+    posted = (
+        f" ({counts['submitted']} submitted, {counts['draft']} kept in Draft)"
+        if settings.pec_auto_submit and counts["created"]
+        else ""
+    )
     status = (
-        f"OK: {counts['created']} claim(s) created, {counts['reconfirmed']} re-confirmed, "
+        f"OK: {counts['created']} claim(s) created{posted}, {counts['reconfirmed']} re-confirmed, "
         f"{counts['skipped']} skipped, {counts['held']} held, {counts['failed']} failed"
     )
     if notes:
@@ -215,9 +232,37 @@ def _claims_by_transaction():
 # Building a claim
 # --------------------------------------------------------------------------- #
 def _create_claim(txn, settings, currency):
+    """Insert a claim for txn. Returns (name, receipts_ok, complete, amount_note)."""
+    values, complete, amount_note = _claim_values(txn, settings, currency)
+    pec = frappe.get_doc({"doctype": PEC, **values})
+    pec.flags.ignore_permissions = True
+    pec.insert()
+
+    receipts_ok = True
+    if settings.download_receipts and txn.get("receipts"):
+        urls, failed = importer._store_receipts(pec, txn)
+        receipts_ok = not failed
+        if failed:
+            pec.db_set("pemo_receipt_pending", 1, update_modified=False)
+
+    state = (settings.pec_workflow_state or "").strip()
+    if state and not (settings.pec_auto_submit and complete) and state != (pec.get("workflow_state") or "Draft"):
+        pec.workflow_state = state
+        pec.save()
+    return pec.name, receipts_ok, complete, amount_note
+
+
+def _claim_values(txn, settings, currency):
+    """(claim field values, complete, amount note) for a Pemo transaction.
+
+    complete = every row's account came from a Pemo category. Only complete
+    claims are auto-submitted: one without a category would post to the default
+    account straight away.
+    """
     rows = importer.build_rows(txn, settings.company, currency)
     first = rows[0]
     rate = flt(settings.vat_rate) or 5
+    complete = all(r.get("pemo_category") and r.get("expense_account") for r in rows)
 
     expense_type = settings.pec_expense_type or "Other Expenses"
     project = next((r.get("project") for r in rows if r.get("project")), None)
@@ -235,50 +280,60 @@ def _create_claim(txn, settings, currency):
             header = {}
 
     details = [_detail_row(r, settings, rate, header.get("project")) for r in rows]
+    categories = " | ".join(dict.fromkeys(r.get("pemo_category") for r in rows if r.get("pemo_category")))
+    values = {
+        "requested_by": _requester(first.get("spender"), settings),
+        "expense_type": expense_type,
+        "date": first.get("date"),
+        "cheque_number": (first.get("pemo_reference") or txn.get("id"))[:140],
+        "petty_cash_account": settings.pemo_account,
+        "status": "Paid" if settings.mark_pec_paid else "Unpaid",
+        "pemo_transaction_id": txn.get("id"),
+        "pemo_reference": first.get("pemo_reference"),
+        "pemo_cardholder": first.get("cardholder") or first.get("spender"),
+        "pemo_supplier": first.get("supplier"),
+        "pemo_supplier_trn": first.get("supplier_trn"),
+        "pemo_invoice_no": first.get("invoice_no"),
+        "pemo_transaction_type": first.get("transaction_type"),
+        "pemo_category": categories[:140],
+        "petty_expense_details": details,
+        "total_incl": flt(sum(d["amount_incl_of_vat"] for d in details), 2),
+        "total_excl": flt(sum(d["amount_excl_of_vat"] for d in details), 2),
+        **header,
+    }
+    return values, complete, importer.pemo_amount(txn)[1]
 
-    pec = frappe.get_doc(
-        {
-            "doctype": PEC,
-            "requested_by": _requester(first.get("spender"), settings),
-            "expense_type": expense_type,
-            "date": first.get("date"),
-            "cheque_number": (first.get("pemo_reference") or txn.get("id"))[:140],
-            "petty_cash_account": settings.pemo_account,
-            "status": "Paid" if settings.mark_pec_paid else "Unpaid",
-            "pemo_transaction_id": txn.get("id"),
-            "pemo_reference": first.get("pemo_reference"),
-            "pemo_cardholder": first.get("cardholder") or first.get("spender"),
-            "pemo_supplier": first.get("supplier"),
-            "pemo_supplier_trn": first.get("supplier_trn"),
-            "pemo_invoice_no": first.get("invoice_no"),
-            "pemo_transaction_type": first.get("transaction_type"),
-            "petty_expense_details": details,
-            "total_incl": flt(sum(d["amount_incl_of_vat"] for d in details), 2),
-            "total_excl": flt(sum(d["amount_excl_of_vat"] for d in details), 2),
-            **header,
-        }
-    )
-    pec.flags.ignore_permissions = True
-    pec.insert()
 
-    receipts_ok = True
-    if settings.download_receipts and txn.get("receipts"):
-        urls, failed = importer._store_receipts(pec, txn)
-        receipts_ok = not failed
-        if failed:
-            pec.db_set("pemo_receipt_pending", 1, update_modified=False)
+def _submit_claim(name):
+    """Submit without approval, as Administrator. Returns an error string, or None.
 
-    state = (settings.pec_workflow_state or "").strip()
-    if state and state != (pec.get("workflow_state") or "Draft"):
-        pec.workflow_state = state
-        pec.save()
-    return pec.name, receipts_ok
+    Submitting from Draft sets the workflow to its submitted state (Approved),
+    and the site's "JV CREATION NEW -v" script then posts the Journal Entry.
+    Runs as Administrator so posting doesn't depend on who clicked Sync Now.
+    On failure the claim stays a saved Draft.
+    """
+    user = frappe.session.user
+    try:
+        frappe.set_user("Administrator")
+        pec = frappe.get_doc(PEC, name)
+        pec.flags.ignore_permissions = True
+        pec.submit()
+        frappe.db.commit()
+        return None
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), f"Pemo claim {name}: auto-submit failed")
+        return str(e)[:200]
+    finally:
+        frappe.set_user(user)
 
 
 def _detail_row(r, settings, rate, project):
     claim_type, account = _expense_claim_type(r, settings)
     gross = flt(r.get("amount_incl"), 2)
     vat_applicable = r.get("vat_applicable") or settings.default_vat_applicable or "No"
+    if vat_applicable == "Yes" and flt(r.get("pemo_vat_rate")) > 0:
+        rate = flt(r.get("pemo_vat_rate"))
     if vat_applicable == "Yes":
         net = flt(gross / (1 + rate / 100), 2)
         vat = flt(gross - net, 2)
@@ -297,7 +352,7 @@ def _detail_row(r, settings, rate, project):
         "amount_excl_of_vat": net,
         "vat_amount": vat,
         "expense_account": account,
-        "vat_account": settings.input_vat_account,
+        "vat_account": r.get("vat_account") or settings.input_vat_account,
     }
     if project:
         row["project"] = project
@@ -321,10 +376,21 @@ def _expense_claim_type(r, settings):
         if claim_type:
             return claim_type, account
     category = (r.get("pemo_category") or "").split(" | ")[0].strip()
-    if category and frappe.db.exists("Expense Claim Type", category):
-        return category, account or _default_account(category, settings.company)
+    abbr = frappe.get_cached_value("Company", settings.company, "abbr")
+    candidates = [category, _strip_abbr(category, abbr)]
+    if account:
+        candidates.append(frappe.db.get_value("Account", account, "account_name"))
+    for name in dict.fromkeys(c for c in candidates if c):
+        if frappe.db.exists("Expense Claim Type", name):
+            return name, account or _default_account(name, settings.company)
     claim_type = settings.default_expense_claim_type
     return claim_type, account or _default_account(claim_type, settings.company)
+
+
+def _strip_abbr(value, abbr):
+    """'Site Welfare - DS' -> 'Site Welfare'."""
+    suffix = f" - {abbr}" if abbr else None
+    return value[: -len(suffix)].strip() if suffix and value.endswith(suffix) else value
 
 
 def _default_account(claim_type, company):
@@ -364,3 +430,69 @@ def _retry_receipts(pec_name, txn):
         frappe.db.set_value(PEC, pec_name, "pemo_receipt_pending", 0, update_modified=False)
     frappe.db.commit()
     return not failed
+
+
+# --------------------------------------------------------------------------- #
+# Refresh a draft claim from Pemo
+# --------------------------------------------------------------------------- #
+@frappe.whitelist()
+def refresh_claim(name):
+    """Re-read a draft claim's transaction from Pemo and rebuild it.
+
+    For a claim kept in Draft because Pemo had no category yet: set the category
+    in Pemo, then click Refresh from Pemo. Rows, amounts, VAT and Pemo fields are
+    rebuilt; receipts are re-downloaded if missing; a now-complete claim is
+    submitted when Auto Submit is on.
+    """
+    pec = frappe.get_doc(PEC, name)
+    pec.check_permission("write")
+    if pec.docstatus != 0:
+        frappe.throw(_("Only a draft claim can be refreshed from Pemo."))
+    if not pec.pemo_transaction_id:
+        frappe.throw(_("This claim did not come from Pemo."))
+
+    settings = frappe.get_single("Pemo Settings")
+    client = PemoClient(settings)
+    currency = frappe.get_cached_value("Company", settings.company, "default_currency")
+    txn = _find_transaction(client, pec.pemo_transaction_id, pec.date)
+    if not txn:
+        frappe.throw(_("Pemo transaction {0} was not found around {1}.").format(pec.pemo_transaction_id, pec.date))
+
+    values, complete, amount_note = _claim_values(txn, settings, currency)
+    for field in ("requested_by", "status"):
+        values.pop(field, None)  # keep what's on the claim
+    pec.update(values)
+    pec.flags.ignore_permissions = True
+    pec.save()
+
+    has_receipts = frappe.db.exists(
+        "File", {"attached_to_doctype": PEC, "attached_to_name": name, "file_name": ["like", "pemo-%"]}
+    )
+    if settings.download_receipts and txn.get("receipts") and (not has_receipts or pec.pemo_receipt_pending):
+        _retry_receipts(name, txn)
+    frappe.db.commit()
+
+    message = _("Refreshed from Pemo: {0}, total {1}.").format(
+        pec.pemo_category or _("no category"), frappe.format_value(pec.total_incl, {"fieldtype": "Currency"})
+    )
+    if amount_note:
+        message += "<br>" + amount_note
+    if settings.pec_auto_submit:
+        if complete:
+            error = _submit_claim(name)
+            message += "<br>" + (_("Submit failed: {0}").format(error) if error else _("Submitted."))
+        else:
+            message += "<br>" + _("Kept in Draft: set a category for this transaction in Pemo first.")
+    return message
+
+
+def _find_transaction(client, txn_id, date):
+    """The transaction with this id, searched in all export states within a few days of the claim date."""
+    from frappe.utils import add_days
+
+    start_iso, end_iso = importer.utc_window(add_days(date, -3), add_days(date, 3))
+    for page in client.iter_transaction_pages(start_iso, end_iso, export_status="all"):
+        for txn in page:
+            if txn.get("id") == txn_id:
+                return txn
+    return None

@@ -17,6 +17,12 @@ after_install = "pemo_sync.install.after_install"
 after_migrate = "pemo_sync.install.after_migrate"
 
 # ---------------------------------------------------------------------------
+# Form scripts on Designsmith's own doctypes
+# ---------------------------------------------------------------------------
+# "Refresh from Pemo" on a draft Petty Expense Claim that came from Pemo.
+doctype_js = {"Petty Expense Claim": "public/js/petty_expense_claim.js"}
+
+# ---------------------------------------------------------------------------
 # Scheduler
 # ---------------------------------------------------------------------------
 # Pemo has no webhooks, so "push" is a pull every 15 minutes: transactions an

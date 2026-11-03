@@ -110,7 +110,11 @@ def fetch_into(name):
                 if failed:
                     notes.append(f"{txn_id}: {failed} receipt(s) failed to download")
 
+            amount_note = pemo_amount(txn)[1]
+            if amount_note:
+                notes.append(f"{txn_id}: {amount_note}")
             for row in build_rows(txn, doc.company, company_currency):
+                row.pop("pemo_vat_rate", None)
                 row["receipt_attachment"] = receipt_urls[0] if receipt_urls else None
                 row["receipt_files"] = "\n".join(receipt_urls)
                 doc.append("transactions", row)
@@ -132,9 +136,32 @@ def fetch_into(name):
 # --------------------------------------------------------------------------- #
 # Mapping
 # --------------------------------------------------------------------------- #
+def pemo_amount(txn):
+    """Gross in major units, and a note when Pemo's own total disagrees.
+
+    Pemo defines totalAmount as billingAmount + the FX fee. On Designsmith's live
+    account totalAmount comes back 10x too large (ENOC: totalAmount 120000,
+    billingAmount 12000, walletDebitedAmount 12000 for an AED 120.00 purchase;
+    the wallet balance only reconciles with billingAmount). So the amount is
+    computed from its definition rather than read from totalAmount, which also
+    stays right if Pemo fixes their side.
+    """
+    total = abs(flt(txn.get("totalAmount")))
+    if txn.get("billingAmount") is None:
+        return total / 100, None
+    correct = abs(flt(txn.get("billingAmount"))) + abs(flt((txn.get("feeDetails") or {}).get("fx")))
+    note = None
+    if total and abs(total - correct) >= 1:
+        note = "Pemo totalAmount {0:.2f} differs from billing + FX fee {1:.2f}; booked {1:.2f}".format(total / 100, correct / 100)
+    return correct / 100, note
+
+
 def build_rows(txn, company, company_currency):
     """One row per transaction, or one per split line when Pemo split it."""
-    total = abs(flt(txn.get("totalAmount")) / 100)
+    total, _note = pemo_amount(txn)
+    # Line amounts get the same correction when they carry the same inflation.
+    raw_total = abs(flt(txn.get("totalAmount"))) / 100
+    line_scale = raw_total / total if total and raw_total > total * 1.5 else 1
     tx_type = txn.get("transactionType") or ""
     is_credit = 1 if (tx_type in CREDIT_TYPES or (tx_type not in DEBIT_TYPES and flt(txn.get("totalAmount")) < 0)) else 0
     header = _accounting(txn.get("accounting"))
@@ -159,6 +186,8 @@ def build_rows(txn, company, company_currency):
 
     lines = txn.get("lineItems") or []
     usable = [l for l in lines if (l.get("currency") or base["currency"]) == base["currency"] and flt(l.get("amount"))]
+    if usable and line_scale != 1 and sum(abs(flt(l.get("amount"))) for l in usable) / 100 <= total * 1.001:
+        line_scale = 1  # lines already in true units; only the header total was inflated
     if not usable or len(usable) != len(lines):
         return [_row(base, header, total, company)]
 
@@ -166,7 +195,7 @@ def build_rows(txn, company, company_currency):
     for line in usable:
         line_acc = _accounting(line.get("accounting"))
         merged = {**header, **line_acc}
-        amount = abs(flt(line.get("amount")) / 100)
+        amount = flt(abs(flt(line.get("amount")) / 100) / line_scale, 2)
         row = _row(base, merged, amount, company)
         row["pemo_line_id"] = line.get("id") or ""
         if line.get("description"):
@@ -199,6 +228,11 @@ def _row(base, acc, amount, company):
     row["expense_account"] = find_account(company, coa.get("code"), coa.get("value"))
     row["project"] = find_project((acc.get("project") or {}).get("code"), (acc.get("project") or {}).get("value"))
     row["vat_applicable"] = vat_applicable_from_code(row["pemo_vat_code"])
+    rate, vat_account = vat_details_from_code(company, row["pemo_vat_code"])
+    if vat_account:
+        row["vat_account"] = vat_account
+    if rate is not None:
+        row["pemo_vat_rate"] = rate
     return row
 
 
@@ -231,12 +265,34 @@ def vat_applicable_from_code(code):
         return ""
     if any(word in text for word in ("zero", "exempt", "out of scope", "no vat", "non-vat")):
         return "No"
-    match = re.search(r"(\d+(?:\.\d+)?)\s*%", text)
+    match = re.search(r"(\d+(?:\.\d+)?)\s*%", text) or VAT_RATE_TAIL.search(text)
     if match:
         return "Yes" if flt(match.group(1)) > 0 else "No"
     if "standard" in text or "vat" in text:
         return "Yes"
     return ""
+
+
+# Designsmith's Pemo VAT codes read "VAT Input - DS -   - 5": an account name,
+# then the rate at the end, with no % sign.
+VAT_RATE_TAIL = re.compile(r"[-\s](\d+(?:\.\d+)?)\s*%?\s*$")
+
+
+def vat_details_from_code(company, code):
+    """(rate or None, VAT account or None) read out of a Pemo VAT code label."""
+    text = (code or "").strip()
+    if not text:
+        return None, None
+    match = re.search(r"(\d+(?:\.\d+)?)\s*%", text) or VAT_RATE_TAIL.search(text)
+    rate = flt(match.group(1)) if match else None
+    parts = [p.strip() for p in text.split(" - ")]
+    account = None
+    for n in range(len(parts), 0, -1):
+        candidate = " - ".join(p for p in parts[:n] if p)
+        if candidate and frappe.db.get_value("Account", {"name": candidate, "company": company, "is_group": 0}):
+            account = candidate
+            break
+    return rate, account
 
 
 def find_account(company, code, value):
@@ -246,7 +302,10 @@ def find_account(company, code, value):
         if name:
             return name
     if value:
-        return frappe.db.get_value("Account", {**base, "account_name": value})
+        # Designsmith's Pemo categories carry the full account name ("Vehicle Fuel - DS").
+        return frappe.db.get_value("Account", {**base, "name": value}) or frappe.db.get_value(
+            "Account", {**base, "account_name": value}
+        )
     return None
 
 

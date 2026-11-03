@@ -26,6 +26,7 @@
   "column_break_pec",
   "default_requested_by",
   "default_vat_applicable",
+  "pec_auto_submit",
   "pec_workflow_state",
   "mark_pec_paid",
   "section_pec_status",
@@ -177,7 +178,14 @@
    "options": "No\nYes"
   },
   {
-   "description": "Leave blank to create claims in Draft. Otherwise a draft workflow state of the Petty Expense Claim workflow, e.g. Waiting for Accounts Approval.",
+   "default": "0",
+   "description": "Submit each claim as soon as it is created, with no approval. The workflow goes straight to Approved and the JV CREATION script posts the Journal Entry. Claims whose Pemo transaction has no category stay in Draft.",
+   "fieldname": "pec_auto_submit",
+   "fieldtype": "Check",
+   "label": "Auto Submit Claims"
+  },
+  {
+   "description": "Only for claims that are not auto-submitted. Leave blank for Draft, or give a draft state of the Petty Expense Claim workflow, e.g. Waiting for Accounts Approval.",
    "fieldname": "pec_workflow_state",
    "fieldtype": "Data",
    "label": "Claim Workflow State"
@@ -211,7 +219,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-23 12:00:00.000000",
+ "modified": "2026-11-03 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Pemo Sync",
  "name": "Pemo Settings",

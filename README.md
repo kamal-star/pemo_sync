@@ -25,6 +25,26 @@ Each pass:
 3. Tells Pemo the transaction is exported (`PATCH markAsExported`), so it never arrives
    twice.
 
+### Auto Submit (Designsmith runs with it on)
+
+With **Pemo Settings → Auto Submit Claims** ticked, each claim is submitted as soon as
+it is created, with no approval. The workflow goes straight to Approved, and "JV
+CREATION NEW -v" posts the Journal Entry. The submit runs as Administrator, so it
+doesn't depend on who clicked Sync Now.
+
+**A claim whose Pemo transaction has no category stays in Draft.** It would otherwise
+post to the default account. To finish one: set the category in Pemo, open the claim,
+and click **Refresh from Pemo**. That rebuilds the rows, amounts and VAT from Pemo,
+then submits the claim. Last Sync Status lists every claim kept in Draft.
+
+### Amounts
+
+The amount booked is Pemo's `billingAmount` plus the FX fee, which is how Pemo itself
+defines `totalAmount`. On Designsmith's live account, `totalAmount` comes back 10 times
+too large; `billingAmount` and `walletDebitedAmount` are right, and the wallet balance
+reconciles with them. Every mismatch is noted in Last Sync Status. If Pemo fixes their
+side, nothing changes here.
+
 ### How a claim is filled
 
 | Claim field | From |
@@ -35,8 +55,8 @@ Each pass:
 | Petty Cash Account | the Pemo wallet (PEMO - DS), so the approval JE credits the wallet |
 | Status | Paid. The card already paid it, so it must not be paid again through a Payment Entry |
 | Rows | one per Pemo line (split transactions give several rows) |
-| Row Expense Type + Account | Pemo's category → the account with that number or name → the Expense Claim Type that defaults to that account. Else a claim type named like the category. Else Settings → Default Expense Claim Type |
-| Row VAT | Pemo VAT code (5% → Yes; zero/exempt → No); else Settings → VAT Applicable when Unknown |
+| Row Expense Type + Account | Pemo's category is the account: its full name ("Vehicle Fuel - DS"), short name, or number. The type is the Expense Claim Type that defaults to that account, else one named like it ("Site Welfare - DS" → Site Welfare), else Settings → Default Expense Claim Type |
+| Row VAT | Pemo VAT code: "VAT Input - DS - 5" → Yes at 5% on VAT Input - DS; "5%" / standard → Yes; zero / exempt → No. With no code, Settings → VAT Applicable when Unknown. The VAT amount is backed out of the gross |
 | Pemo section | transaction id, reference, type, cardholder, supplier, TRN, invoice no |
 | Attachments | every receipt, downloaded during the pass (Pemo's links expire after about 30 minutes) |
 
@@ -183,7 +203,8 @@ Auto Sync: `bench --site erp.designsmith.ae enable-scheduler`.
 | Default Expense Claim Type | Miscellaneous Expense (→ Office expenses - DS) |
 | Fallback Requested By | an accounts user who owns claims from cards with no ERPNext user |
 | VAT Applicable when Unknown | No |
-| Claim Workflow State | blank (Draft), or Waiting for Accounts Approval |
+| Auto Submit Claims | ticked (no approval; claims with no Pemo category stay Draft) |
+| Claim Workflow State | blank (only used when a claim is not auto-submitted) |
 | Mark Claims as Paid | ticked |
 
 Save, then click **Test Connection**.
